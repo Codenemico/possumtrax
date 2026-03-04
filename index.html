@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Possum Trax</title>
+  <link rel="icon" type="image/png" href="img/tracks.png" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+/* ===== Global ===== */
+:root{
+  --track-alpha: 1;
+  --chord-font-size: 24px;
+  --lyric-font-size: 18px;
+}
+
+body, html{ height:100%; }
+
+body {
+  background-image:url(img/bg.jpg);
+  background-size:cover;
+  background-position:center;
+  background-attachment:fixed;
+  margin: 0;
+  font-family: Arial, sans-serif;
+  font-size: 18px;
+  animation: rotate-bg-color 2000s infinite;
+}
+
+/* Header + settings button */
+header {
+  border-bottom:1px solid white;
+  text-align: center;
+  background: rgb(45, 127, 249, 0.6);
+  color: rgb(255, 255, 255);
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.header-left { display: flex; align-items:center; gap:12px; }
+.header-left h1 { display:inline-block; margin:0; font-size:20px; }
+
+/* Settings button */
+.settings-btn {
+  margin-left: auto;
+  margin-right: 8px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  font-weight:600;
+}
+
+/* Settings panel */
+.settings-panel {
+  position: fixed;
+  right: 18px;
+  top: 74px;
+  width: 320px;
+  max-width: calc(100% - 36px);
+  background: rgba(10,12,16,0.85);
+  color: #e6eef8;
+  border-radius: 10px;
+  padding: 14px;
+  box-shadow: 0 12px 36px rgba(2,6,23,0.75);
+  z-index: 1200;
+  display: none;
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255,255,255,0.03);
+}
+.settings-panel.open { display: block; }
+
+.settings-row { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+.settings-row label { flex: 0 0 120px; font-size:14px; color:#bcd3f8; }
+.settings-row input[type="range"] { flex:1; }
+.settings-value { width:48px; text-align:right; font-weight:600; color:#cfe1ff; }
+
+/* main */
+main { max-width: 1600px; margin: auto; padding: 24px 32px; }
+
+/* ===== Buttons ===== */
+button { padding: 6px 10px; border: none; border-radius: 6px; cursor: pointer; font-size: 20px; }
+
+.add { background: #2d7ff9; color: white; }
+.delete { background: #d9534f; color: white; }
+.transpose { background: #444; color: white; }
+.expand-btn { font-size: 18px; margin-right: 6px; background:none; border:none; cursor:pointer; }
+
+/* solo button */
+.solo-btn { font-size:14px; padding:6px 8px; border-radius:8px; background:transparent; color:#444; border:1px solid rgba(0,0,0,0.06); cursor:pointer; }
+.solo-btn.active { background:#d9534f; color:#fff; border-color:rgba(217,83,79,0.18); box-shadow:0 6px 18px rgba(217,83,79,0.12); }
+
+/* ===== Track / bars styling (unchanged) ===== */
+.track { background: rgba(255,255,255,var(--track-alpha)); margin-bottom:16px; border-radius:8px; box-shadow:0 3px 6px rgba(0,0,0,.12); transition:background .18s,box-shadow .12s; }
+.track.solo-indicator { box-shadow:0 10px 30px rgba(11,102,243,0.12); border:1px solid rgba(11,102,243,0.07); }
+
+.track-header { display:flex; align-items:center; padding:18px; background:rgba(240,240,240,0.9); gap:8px; }
+.track-header input { font-size:22px; font-weight:700; border:2px solid #555; border-radius:4px; padding:4px 6px; width:100%; }
+
+.track-body { display:none; padding:20px; border-top:1px solid #ccc; }
+.track-body.open { display:block; }
+
+.controls { margin-bottom:14px; }
+.staff { display:flex; flex-wrap:wrap; gap:10px; }
+
+.bar { display:flex; flex-direction:column; align-items:center; border-left:3px solid #000; padding:6px 8px; text-align:center; min-width:120px; max-width:100%; flex:0 0 auto; word-break:break-word; position:relative; box-sizing:border-box; transition:none; }
+.bar:last-child { border-right:3px solid #000; }
+
+.bar input { border:2px solid #888; border-radius:4px; text-align:center; font-family:monospace; background:#fff; padding:4px 6px; width:auto; max-width:100%; box-sizing:border-box; transition:none; }
+
+.chord {
+}
+
+/* Multi-chord elements
+   Added additional top space to the chord layer so chords sit lower than the bar-controls.
+   Each chord has 5px vertical margin (top/bottom) and the delete X is positioned above the chord,
+   centered horizontally.
+*/
+.chords-layer {
+  position:relative;
+  width:100%;
+  height:84px;
+  margin-bottom:8px;
+  pointer-events:none;
+  box-sizing:content-box;
+  padding-top:8px;
+}
+.chord-multi {
+  position:absolute;
+  top:28px;
+  left:8px;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  pointer-events:auto;
+  cursor:grab;
+  background:linear-gradient(180deg,#fff,#f3f3f3);
+  border:1px solid rgba(0,0,0,0.08);
+  padding:6px 8px;
+  border-radius:6px;
+  font-family:monospace;
+  font-weight:700;
+  color:rgb(13,0,255);
+  white-space:nowrap;
+  user-select:none;
+  font-size:var(--chord-font-size);
+  margin:5px 0;
+  box-sizing:border-box;
+}
+.chord-multi:active { cursor:grabbing; }
+/* allow the inner input to size to text; chord element will be sized by JS */
+.chord-multi input { border:none; background:transparent; font-family:inherit; font-weight:inherit; font-size:inherit; outline:none; width:auto; min-width:8px; max-width:2000px; padding:0; margin:0; box-sizing:content-box; color:inherit; }
+
+/* Delete X positioned above each chord, centered.
+   Hidden by default, shown on hover.
+*/
+.chord-delete {
+  position:absolute;
+  top:-20px;
+  left:50%;
+  width:90%;
+  transform:translateX(-50%);
+  border:1px solid black;
+  background:transparent;
+  color:red;
+  font-weight:700;
+  cursor:pointer;
+  padding:0;
+  margin:0;
+  font-size:16px;
+  opacity:0;
+  transition:opacity .12s;
+  pointer-events:none;
+}
+
+.chord-delete:hover{ background:black; color:red; }
+.chord-multi:hover .chord-delete { opacity:1; pointer-events:auto; }
+
+/* Lyrics */
+.lyric-wrap { position:relative; display:block; width:100%; }
+/* we keep padding-right so there's visible gap for the handle; JS computes extras dynamically */
+.bar input.lyric { font-size:var(--lyric-font-size); display:inline-block; padding-right:28px; }
+
+/* Lyric resize handle */
+.lyric-resize-handle { position:absolute; right:0; top:0; bottom:0; width:12px; cursor:ew-resize; user-select:none; touch-action:none; background:linear-gradient(90deg, rgba(0,0,0,0.04), rgba(0,0,0,0)); border-top-right-radius:6px; border-bottom-right-radius:6px; }
+.lyric-resize-handle::after{ content:""; display:block; width:2px; height:28px; background:rgba(0,0,0,0.2); margin:8px auto; border-radius:2px; }
+
+/* Bar Controls: vertically aligned; prevent wrapping */
+.bar-controls { display:flex; justify-content:flex-end; gap:6px; margin-bottom:4px; opacity:0; transition:opacity .14s; position:absolute; top:-12px; right:12px; white-space:nowrap; }
+.bar-controls button { white-space:nowrap; }
+.bar:hover .bar-controls, .bar.show-controls .bar-controls { opacity:1; }
+
+/* helper to hide non-soloed tracks */
+.track.hidden-by-solo { display:none !important; }
+  </style>
+</head>
+<body>
+<header>
+  <div class="header-left">
+    <img style="width:60px;display:inline-block;" src="img/tracks.png" alt="logo" />
+    <h1>Possum Trax</h1>
+  </div>
+
+  <div>
+    <button class="settings-btn" id="settingsToggle">⚙ Settings</button>
+  </div>
+
+  <div class="settings-panel" id="settingsPanel" role="dialog" aria-hidden="true">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <strong style="color:#fff">Appearance Settings</strong>
+      <button id="settingsClose" style="background:transparent;border:none;color:#dfefff;cursor:pointer">✕</button>
+    </div>
+
+    <div class="settings-row">
+      <label for="transparencyRange">Track transparency</label>
+      <input id="transparencyRange" type="range" min="50" max="100" step="1" />
+      <div class="settings-value" id="transparencyValue">100%</div>
+    </div>
+
+    <div class="settings-row">
+      <label for="chordSizeRange">Chord font size</label>
+      <input id="chordSizeRange" type="range" min="12" max="40" step="1" />
+      <div class="settings-value" id="chordSizeValue">24px</div>
+    </div>
+
+    <div class="settings-row">
+      <label for="lyricSizeRange">Lyric font size</label>
+      <input id="lyricSizeRange" type="range" min="12" max="40" step="1" />
+      <div class="settings-value" id="lyricSizeValue">18px</div>
+    </div>
+
+    <div style="margin-top:8px;font-size:12px;color:#bcd3f8"></div>
+  </div>
+</header>
+
+<main>
+  <button class="add">+ Add Song</button>
+  <div id="tracks"></div>
+</main>
+
+<script>
+/* ===== Settings storage and application ===== */
+const SETTINGS_KEY = "live_chart_settings";
+function defaultSettings() { return { transparency: 100, chordSize: 24, lyricSize: 18 }; }
+function loadSettings() { try { const raw = localStorage.getItem(SETTINGS_KEY); if(!raw) return defaultSettings(); return Object.assign(defaultSettings(), JSON.parse(raw)); } catch(e) { return defaultSettings(); } }
+function saveSettings(s) { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); }
+
+function applySettingsToUI(s) {
+  document.getElementById('transparencyRange').value = s.transparency;
+  document.getElementById('transparencyValue').textContent = s.transparency + '%';
+  document.getElementById('chordSizeRange').value = s.chordSize;
+  document.getElementById('chordSizeValue').textContent = s.chordSize + 'px';
+  document.getElementById('lyricSizeRange').value = s.lyricSize;
+  document.getElementById('lyricSizeValue').textContent = s.lyricSize + 'px';
+}
+
+function applySettingsToDocument(s) {
+  const alpha = Math.max(50, Math.min(100, Number(s.transparency))) / 100;
+  document.documentElement.style.setProperty('--track-alpha', String(alpha));
+  document.documentElement.style.setProperty('--chord-font-size', s.chordSize + 'px');
+  document.documentElement.style.setProperty('--lyric-font-size', s.lyricSize + 'px');
+
+  // After font changes, recompute lyric widths and schedule chord sizing asynchronously
+  const recomputeAfterFonts = () => {
+    try { recomputeLyricWidthsAndPersist(); } catch(e) { console.error('Error recomputing lyric widths', e); }
+    finalizeAutosizeThenSync();
+    // schedule chord remeasure for the visible chords (batched)
+    scheduleMeasureAllVisibleChords();
+  };
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(recomputeAfterFonts).catch(recomputeAfterFonts);
+  } else {
+    recomputeAfterFonts();
+  }
+}
+
+/* finalize autosize helper */
+function finalizeAutosizeThenSync() {
+  autosizeAllBars();
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      autosizeAllBars();
+      setTimeout(() => { syncDomToStorage(); }, 80);
+    });
+  });
+}
+
+/* ===== App data persistence ===== */
+const STORAGE = "live_chart_tracks";
+function load() { return JSON.parse(localStorage.getItem(STORAGE)) || []; }
+function save(data) { localStorage.setItem(STORAGE, JSON.stringify(data)); }
+
+/* ===== Utilities for measuring text width ===== */
+function measureInputTextWidth(input) {
+  const value = input.value || input.placeholder || "";
+  const span = document.createElement("span");
+  const style = window.getComputedStyle(input);
+  span.style.visibility = "hidden";
+  span.style.position = "absolute";
+  span.style.whiteSpace = "pre";
+  span.style.fontSize = style.fontSize;
+  span.style.fontFamily = style.fontFamily;
+  span.style.fontWeight = style.fontWeight;
+  span.style.fontStyle = style.fontStyle;
+  span.style.letterSpacing = style.letterSpacing;
+  span.textContent = value || " ";
+  document.body.appendChild(span);
+  const w = span.offsetWidth;
+  document.body.removeChild(span);
+  return w;
+}
+
+function computeHorizontalExtras(input) {
+  const style = window.getComputedStyle(input);
+  const paddingLeft = parseFloat(style.paddingLeft) || 0;
+  const paddingRight = parseFloat(style.paddingRight) || 0;
+  const borderLeft = parseFloat(style.borderLeftWidth) || 0;
+  const borderRight = parseFloat(style.borderRightWidth) || 0;
+  const extras = paddingLeft + paddingRight + borderLeft + borderRight;
+  const safetyBuffer = 18;
+  return Math.round(extras + safetyBuffer);
+}
+
+/* autosize helpers for lyric & generic inputs */
+function adjustInputWidth(input) {
+  if (!input) return;
+  if (input.dataset.preserveWidth === "1") return;
+  const span = document.createElement("span");
+  const style = window.getComputedStyle(input);
+  span.style.visibility = "hidden";
+  span.style.position = "absolute";
+  span.style.whiteSpace = "pre";
+  span.style.fontSize = style.fontSize;
+  span.style.fontFamily = style.fontFamily;
+  span.style.fontWeight = style.fontWeight;
+  span.style.fontStyle = style.fontStyle;
+  span.style.letterSpacing = style.letterSpacing;
+  span.textContent = input.value || input.placeholder || " ";
+  document.body.appendChild(span);
+
+  const horizExtras = computeHorizontalExtras(input);
+  let parentWidth;
+  if (input.classList && input.classList.contains('lyric')) parentWidth = 2000;
+  else parentWidth = input.parentElement ? input.parentElement.clientWidth - 12 : Infinity;
+  let desired = Math.min(span.offsetWidth + horizExtras, parentWidth);
+  const minUser = parseInt(input.dataset.userMinWidth, 10);
+  if (!Number.isNaN(minUser)) desired = Math.max(desired, minUser);
+  input.style.width = desired + "px";
+  document.body.removeChild(span);
+}
+function makeAutosize(input) {
+  if (!input) return;
+  if (input.dataset.autosize === "1") return;
+  const handler = (ev) => { if (input.dataset.preserveWidth === "1") delete input.dataset.preserveWidth; adjustInputWidth(input); };
+  ["input","change","cut","paste","keyup"].forEach(evt => input.addEventListener(evt, handler));
+  if (input.dataset.preserveWidth !== "1") adjustInputWidth(input);
+  const mo = new MutationObserver(muts => { for(const m of muts) if (m.type === 'attributes' && m.attributeName === 'value') { if (input.dataset.preserveWidth === "1") continue; adjustInputWidth(input); } });
+  mo.observe(input, { attributes:true });
+  input.dataset.autosize = "1";
+}
+function autosizeAllBars(){ document.querySelectorAll(".bar input").forEach(makeAutosize); }
+
+/* ===== Recompute lyric widths after font-size changes ===== */
+function recomputeLyricWidthsAndPersist() {
+  const container = document.getElementById('tracks');
+  if (!container) return;
+  const trackEls = Array.from(container.querySelectorAll('.track'));
+  const tracksModel = load();
+
+  trackEls.forEach((trackEl, ti) => {
+    const barEls = Array.from(trackEl.querySelectorAll('.bar'));
+    barEls.forEach((barEl, bi) => {
+      const inp = barEl.querySelector('.lyric');
+      if (!inp) return;
+      const measuredTextW = measureInputTextWidth(inp);
+      const extras = computeHorizontalExtras(inp);
+      const desiredLyricW = Math.round(Math.max(40, measuredTextW + extras));
+      inp.style.width = desiredLyricW + 'px';
+      inp.dataset.userMinWidth = desiredLyricW;
+
+      const chordsMulti = barEl.querySelectorAll('.chord-multi');
+      let chordMaxW = 0;
+      chordsMulti.forEach(c=> chordMaxW = Math.max(chordMaxW, Math.round(c.getBoundingClientRect().width)));
+      const desiredBarW = Math.max(desiredLyricW + 24, chordMaxW + 24, 120);
+      barEl.style.width = desiredBarW + 'px';
+
+      tracksModel[ti] = tracksModel[ti] || { bars: [] };
+      tracksModel[ti].bars = tracksModel[ti].bars || [];
+      tracksModel[ti].bars[bi] = tracksModel[ti].bars[bi] || {};
+      tracksModel[ti].bars[bi].width = desiredBarW;
+      if (chordMaxW) tracksModel[ti].bars[bi].chordWidth = chordMaxW;
+    });
+  });
+
+  save(tracksModel);
+}
+
+/* ===== Batched chord autosize scheduler (prevents blocking during large updates) ===== */
+window.__liveChart_chordMeasureQueue = window.__liveChart_chordMeasureQueue || [];
+window.__liveChart_chordMeasureScheduled = false;
+
+function scheduleChordMeasureJob(job) {
+  // job: { inp, chordEl, barEl, ti, bi, ci }
+  window.__liveChart_chordMeasureQueue.push(job);
+  if (window.__liveChart_chordMeasureScheduled) return;
+  window.__liveChart_chordMeasureScheduled = true;
+
+  const run = () => {
+    window.__liveChart_chordMeasureScheduled = false;
+    processChordMeasureQueue();
+  };
+
+  if (window.requestIdleCallback) {
+    requestIdleCallback(run, { timeout: 80 });
+  } else {
+    setTimeout(run, 60);
+  }
+}
+
+function processChordMeasureQueue() {
+  const q = window.__liveChart_chordMeasureQueue;
+  if (!q.length) return;
+
+  const start = performance.now();
+  while (q.length) {
+    const job = q.shift();
+    try { performChordMeasureNow(job); } catch (e) { console.error('Chord measure job failed', e); }
+    if (performance.now() - start > 10) {
+      if (window.requestIdleCallback) requestIdleCallback(processChordMeasureQueue, { timeout: 80 });
+      else setTimeout(processChordMeasureQueue, 30);
+      return;
+    }
+  }
+}
+
+function performChordMeasureNow({ inp, chordEl, barEl, ti, bi, ci }) {
+  if (!inp || !chordEl) return;
+  const measured = measureInputTextWidth(inp);
+  const paddingForChordEl = 20;
+  const innerW = Math.max(6, Math.round(measured));
+  inp.style.width = innerW + 'px';
+  const newW = Math.max(28, innerW + paddingForChordEl);
+  chordEl.style.width = newW + 'px';
+
+  // Persist width
+  try {
+    if (typeof ti === 'number' && typeof bi === 'number' && typeof ci === 'number') {
+      const tracksModel = load();
+      tracksModel[ti] = tracksModel[ti] || { bars: [] };
+      tracksModel[ti].bars = tracksModel[ti].bars || [];
+      tracksModel[ti].bars[bi] = tracksModel[ti].bars[bi] || {};
+      tracksModel[ti].bars[bi].chords = tracksModel[ti].bars[bi].chords || [];
+      tracksModel[ti].bars[bi].chords[ci] = tracksModel[ti].bars[bi].chords[ci] || {};
+      tracksModel[ti].bars[bi].chords[ci].width = newW;
+      save(tracksModel);
+    }
+  } catch (e) { console.error('Error persisting chord width', e); }
+
+  // Expand bar if chord overflows
+  if (barEl) {
+    const left = Math.round(parseFloat(chordEl.style.left || 0));
+    const rightEdge = left + newW;
+    const currentBarW = Math.round(barEl.getBoundingClientRect().width);
+    const desiredBarW = Math.max(currentBarW, Math.round(rightEdge + 24));
+    if (desiredBarW > currentBarW) {
+      barEl.style.width = desiredBarW + 'px';
+      try {
+        if (typeof ti === 'number' && typeof bi === 'number') {
+          const tracksModel = load();
+          tracksModel[ti] = tracksModel[ti] || { bars: [] };
+          tracksModel[ti].bars = tracksModel[ti].bars || [];
+          tracksModel[ti].bars[bi] = tracksModel[ti].bars[bi] || {};
+          tracksModel[ti].bars[bi].width = desiredBarW;
+          save(tracksModel);
+        }
+      } catch (e) { console.error('Error persisting bar width after chord expand', e); }
+    }
+  }
+}
+
+// Replace immediate autosize with scheduled jobs
+function autosizeChordInput(inp, chordEl, barEl, ti, bi, ci) {
+  if (!inp || !chordEl) return;
+  if (!inp.__autosizeChordAttached) {
+    const schedule = () => scheduleChordMeasureJob({ inp, chordEl, barEl, ti, bi, ci });
+    const onInput = (ev) => {
+      try {
+        const t = load();
+        if (typeof ti === 'number') {
+          t[ti] = t[ti] || { title:'', bars:[] };
+          t[ti].bars = t[ti].bars || [];
+          t[ti].bars[bi] = t[ti].bars[bi] || {};
+          t[ti].bars[bi].chords = t[ti].bars[bi].chords || [];
+          t[ti].bars[bi].chords[ci] = t[ti].bars[bi].chords[ci] || {};
+          t[ti].bars[bi].chords[ci].text = ev.target.value;
+          save(t);
+        }
+      } catch (e) {}
+      schedule();
+    };
+    inp.addEventListener('input', onInput);
+    const mo = new MutationObserver(() => schedule());
+    mo.observe(inp, { attributes: true, attributeFilter: ['value'] });
+    inp.__autosizeChordAttached = true;
+  }
+  scheduleChordMeasureJob({ inp, chordEl, barEl, ti, bi, ci });
+}
+
+function scheduleMeasureAllVisibleChords() {
+  const chordEls = document.querySelectorAll('.chord-multi');
+  chordEls.forEach((chEl) => {
+    const inp = chEl.querySelector('input');
+    const barEl = chEl.closest('.bar');
+    let ti = undefined, bi = undefined, ci = undefined;
+    const trackEls = Array.from(document.querySelectorAll('.track'));
+    const trackEl = chEl.closest('.track');
+    if (trackEl) {
+      ti = trackEls.indexOf(trackEl);
+      const barEls = Array.from(trackEl.querySelectorAll('.bar'));
+      bi = barEls.indexOf(barEl);
+      const chordNodes = Array.from(barEl.querySelectorAll('.chord-multi'));
+      ci = chordNodes.indexOf(chEl);
+    }
+    scheduleChordMeasureJob({ inp, chordEl: chEl, barEl, ti, bi, ci });
+  });
+}
+
+/* ===== Multi-chord helpers; createChordElement uses autosizeChordInput ===== */
+function createChordElement(chordObj, barEl, ti, bi, ci) {
+  const chordEl = document.createElement('div');
+  chordEl.className = 'chord-multi';
+  chordEl.style.left = (typeof chordObj.left === 'number' ? chordObj.left + 'px' : '8px');
+
+  const inp = document.createElement('input');
+  inp.value = chordObj.text || '';
+  inp.className = 'chord-input-inner';
+
+  const del = document.createElement('button');
+  del.className = 'chord-delete';
+  del.textContent = '✕';
+
+
+  chordEl.appendChild(inp);
+  chordEl.appendChild(del);
+
+  del.addEventListener('click', (ev) => { ev.stopPropagation(); deleteChord(ti, bi, ci); });
+
+  // wire autosize (scheduled)
+  autosizeChordInput(inp, chordEl, barEl, ti, bi, ci);
+
+  let pointerId = null, startX = 0, startLeft = 0;
+  function onPointerMove(ev) {
+    if (pointerId !== ev.pointerId) return;
+    ev.preventDefault();
+    const dx = ev.clientX - startX;
+    const barRect = barEl.getBoundingClientRect();
+    const elW = chordEl.getBoundingClientRect().width;
+    let newLeft = Math.round(startLeft + dx);
+    newLeft = Math.max(4, Math.min(barRect.width - elW - 4, newLeft));
+    chordEl.style.left = newLeft + 'px';
+  }
+  function onPointerUp(ev) {
+    if (pointerId !== ev.pointerId) return;
+    ev.preventDefault();
+    const finalLeft = Math.round(parseFloat(chordEl.style.left || 0));
+    const t = load();
+    t[ti] = t[ti] || { title:'', bars:[] };
+    t[ti].bars = t[ti].bars || [];
+    t[ti].bars[bi] = t[ti].bars[bi] || {};
+    t[ti].bars[bi].chords = t[ti].bars[bi].chords || [];
+    t[ti].bars[bi].chords[ci] = t[ti].bars[bi].chords[ci] || {};
+    t[ti].bars[bi].chords[ci].left = finalLeft;
+    t[ti].bars[bi].chords[ci].text = t[ti].bars[bi].chords[ci].text || inp.value || '';
+    save(t);
+    pointerId = null;
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', onPointerUp);
+    try{ ev.target.releasePointerCapture && ev.target.releasePointerCapture(ev.pointerId); }catch(e){}
+  }
+  chordEl.addEventListener('pointerdown', (ev)=> {
+    if (ev.target === inp || ev.target === del) return;
+    ev.preventDefault();
+    pointerId = ev.pointerId;
+    startX = ev.clientX;
+    startLeft = Math.round(parseFloat(chordEl.style.left || 0));
+    try{ chordEl.setPointerCapture && chordEl.setPointerCapture(ev.pointerId); }catch(e){}
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+  });
+
+  requestAnimationFrame(()=> {
+    const w = chordObj.width || (inp.getBoundingClientRect().width + 20);
+    chordEl.style.width = w + 'px';
+    if (typeof chordObj.left === 'number') chordEl.style.left = chordObj.left + 'px';
+  });
+
+  return chordEl;
+}
+
+/* ===== Track/Bar mutations ===== */
+function addChord(ti, bi) {
+  const tracks = syncDomToStorage();
+  tracks[ti] = tracks[ti] || { title:'', bars:[] };
+  tracks[ti].bars = tracks[ti].bars || [];
+  tracks[ti].bars[bi] = tracks[ti].bars[bi] || {};
+  tracks[ti].bars[bi].chords = tracks[ti].bars[bi].chords || [];
+
+  const existing = tracks[ti].bars[bi].chords;
+  let newLeft = 8;
+  if (existing.length) {
+    const last = existing[existing.length - 1];
+    const lastLeft = (typeof last.left === 'number') ? last.left : 8;
+    const lastWidth = last.width || 40;
+    newLeft = lastLeft + lastWidth + 8;
+  }
+  existing.push({ text: '', left: newLeft });
+  save(tracks);
+  render();
+  // schedule measurement for all chords after render (batched)
+  scheduleMeasureAllVisibleChords();
+}
+
+function deleteChord(ti, bi, ci) {
+  const tracks = syncDomToStorage();
+  if (!tracks[ti] || !tracks[ti].bars || !tracks[ti].bars[bi] || !tracks[ti].bars[bi].chords) return;
+  tracks[ti].bars[bi].chords.splice(ci, 1);
+  save(tracks);
+  render();
+}
+
+/* ===== sync DOM -> storage helper (updated) ===== */
+function syncDomToStorage() {
+  const tracks = load();
+  const container = document.getElementById('tracks');
+  const trackEls = container.querySelectorAll('.track');
+
+  trackEls.forEach((trackEl, ti) => {
+    if (!tracks[ti]) tracks[ti] = { title:'', bars:[], open:false, solo:false };
+    const headerInput = trackEl.querySelector('.track-header input');
+    if (headerInput) tracks[ti].title = headerInput.value;
+
+    const barEls = trackEl.querySelectorAll('.bar');
+    tracks[ti].bars = tracks[ti].bars || [];
+
+    barEls.forEach((barEl, bi) => {
+      tracks[ti].bars[bi] = tracks[ti].bars[bi] || { chord:'', lyric:'', width:undefined, chordWidth:undefined, chords:[] };
+
+      const chordEls = barEl.querySelectorAll('.chord-multi');
+      const chords = [];
+      chordEls.forEach(ce => {
+        const inp = ce.querySelector('input');
+        const text = inp ? inp.value : '';
+        const left = Math.round(parseFloat(ce.style.left || 0)) || 0;
+        const width = Math.round(ce.getBoundingClientRect().width) || undefined;
+        chords.push({ text, left, width });
+      });
+      if (chords.length) tracks[ti].bars[bi].chords = chords;
+      else tracks[ti].bars[bi].chords = tracks[ti].bars[bi].chords || [];
+
+      const lyricEl = barEl.querySelector('.lyric');
+      if (lyricEl) tracks[ti].bars[bi].lyric = lyricEl.value;
+
+      const w = parseInt(barEl.style.width, 10);
+      if (!Number.isNaN(w)) tracks[ti].bars[bi].width = w;
+
+      const legacyChordEl = barEl.querySelector('.chord');
+      if (legacyChordEl && legacyChordEl.value) {
+        if (!tracks[ti].bars[bi].chords || tracks[ti].bars[bi].chords.length === 0) {
+          tracks[ti].bars[bi].chords = [{ text: legacyChordEl.value, left:8 }];
+        }
+      }
+    });
+  });
+
+  save(tracks);
+  return tracks;
+}
+
+/* Ensure bar controls fit (prevents buttons wrapping) */
+function ensureBarControlsFit(barEl, ti, bi) {
+  if (!barEl) return;
+  const controls = barEl.querySelector('.bar-controls');
+  if (!controls) return;
+  const required = controls.scrollWidth + 28;
+  const chords = barEl.querySelectorAll('.chord-multi');
+  let chordsRight = 0;
+  chords.forEach(c => {
+    const r = c.getBoundingClientRect();
+    const br = barEl.getBoundingClientRect();
+    const right = (r.right - br.left);
+    chordsRight = Math.max(chordsRight, right + 8);
+  });
+  const minNeeded = Math.max(required, chordsRight, 120);
+  const current = barEl.clientWidth || Math.round(barEl.getBoundingClientRect().width);
+  if (current < minNeeded) {
+    barEl.style.width = Math.round(minNeeded) + 'px';
+    const tracks = load();
+    if (tracks[ti] && tracks[ti].bars && tracks[ti].bars[bi]) {
+      tracks[ti].bars[bi].width = Math.round(minNeeded);
+      save(tracks);
+    }
+  }
+}
+
+/* ===== Solo toggling ===== */
+function toggleSolo(ti) {
+  const tracks = load();
+  if (!tracks[ti]) return;
+  const enabling = !Boolean(tracks[ti].solo);
+  tracks.forEach(t => { t.solo = false; });
+  if (enabling) tracks[ti].solo = true;
+  save(tracks);
+  render();
+}
+
+/* ===== Render (preserves focus/scroll) ===== */
+function render() {
+  const tracks = load();
+  const container = document.getElementById('tracks');
+
+  const prevWindowY = window.scrollY || window.pageYOffset || 0;
+  const prevContainerScroll = container && typeof container.scrollTop === 'number' ? container.scrollTop : 0;
+
+  let activeInfo = null;
+  const active = document.activeElement;
+  if (active && container.contains(active)) {
+    const trackElsBefore = Array.from(container.querySelectorAll('.track'));
+    const trackEl = active.closest('.track');
+    const ti = trackElsBefore.indexOf(trackEl);
+    const barElsBefore = trackEl ? Array.from(trackEl.querySelectorAll('.bar')) : [];
+    const barEl = active.closest('.bar');
+    const bi = barElsBefore.indexOf(barEl);
+    const classes = active.className || '';
+    let selStart = null, selEnd = null;
+    try { selStart = active.selectionStart; selEnd = active.selectionEnd; } catch (e) {}
+    activeInfo = { ti, bi, classes, selStart, selEnd };
+  }
+
+  container.innerHTML = '';
+  const soloActive = tracks.some(t => t && t.solo);
+
+  tracks.forEach((track, ti) => {
+    const el = document.createElement('div'); el.className='track';
+    el.innerHTML = `
+      <div class="track-header">
+        <span class="drag-handle" draggable="true">☰</span>
+        <button class="expand-btn">${track.open ? "▼":"▸"}</button>
+        <input value="${(track.title||'').replace(/"/g,'&quot;')}">
+        <button class="solo-btn ${track.solo ? 'active' : ''}" aria-pressed="${track.solo ? 'true' : 'false'}" title="Solo (hide other tracks)">S</button>
+      </div>
+      <div class="track-body ${track.open ? 'open' : ''}">
+        <div class="controls">
+          <button onclick="addBar(${ti})">Add Bar</button>
+          <button class="transpose" onclick="transposeSong(${ti}, -1)">Transpose &#8595;</button>
+          <button class="transpose" onclick="transposeSong(${ti}, 1)">Transpose &#8593;</button>
+          <button class="delete" onclick="deleteTrack(${ti})">Delete Track</button>
+        </div><br>
+        <div class="staff"></div>
+      </div>
+    `;
+
+    const soloBtn = el.querySelector('.solo-btn');
+    soloBtn.addEventListener('click', (ev) => { ev.stopPropagation(); toggleSolo(ti); });
+
+    el.querySelector('.expand-btn').onclick = () => { const t = syncDomToStorage(); t[ti].open = !t[ti].open; save(t); render(); };
+    el.querySelector('.track-header input').oninput = e => { const t = load(); t[ti] = t[ti] || { title:'', bars:[], open:false }; t[ti].title = e.target.value; save(t); };
+
+    const handle = el.querySelector('.drag-handle');
+    handle.addEventListener('dragstart', (e)=>{ dragIndex = ti; e.dataTransfer.effectAllowed='move'; try{ e.dataTransfer.setData('text/plain',''); }catch{}; el.classList.add('dragging'); });
+    handle.addEventListener('dragend', ()=>{ el.classList.remove('dragging'); dragIndex = null; });
+
+    el.addEventListener('dragover', (e)=>{ e.preventDefault(); el.classList.add('drag-over'); e.dataTransfer.dropEffect='move'; });
+    el.addEventListener('dragleave', ()=> el.classList.remove('drag-over'));
+    el.addEventListener('drop', (e)=> {
+      e.preventDefault(); el.classList.remove('drag-over');
+      const targetIndex = Array.from(container.querySelectorAll('.track')).indexOf(el);
+      if (dragIndex==null || dragIndex===targetIndex) return;
+      const tracksNow = syncDomToStorage();
+      const [moved] = tracksNow.splice(dragIndex,1);
+      tracksNow.splice(targetIndex,0,moved);
+      save(tracksNow); render();
+      scheduleMeasureAllVisibleChords();
+    });
+
+    const staff = el.querySelector('.staff');
+    if (track.open) {
+      track.bars = track.bars || [];
+      track.bars.forEach((bar, bi) => {
+        const barEl = document.createElement('div'); barEl.className='bar';
+        if (bar.width) barEl.style.width = bar.width + 'px';
+
+        const controls = document.createElement('div'); controls.className='bar-controls';
+        const addChordBtn = document.createElement('button'); addChordBtn.textContent='+ Chord';
+        addChordBtn.style.fontSize = '14px';
+        addChordBtn.onclick = (ev)=>{ ev.stopPropagation(); addChord(ti,bi); };
+        const insertBtn = document.createElement('button'); insertBtn.textContent = 'Insert';
+        insertBtn.onclick = ()=> insertBar(ti,bi);
+        const deleteBtn = document.createElement('button'); deleteBtn.textContent='Delete';
+        deleteBtn.onclick = ()=> deleteBar(ti,bi);
+        controls.appendChild(addChordBtn); controls.appendChild(insertBtn); controls.appendChild(deleteBtn);
+        barEl.appendChild(controls);
+
+        const chordsLayer = document.createElement('div'); chordsLayer.className='chords-layer';
+        const lyricWrap = document.createElement('div'); lyricWrap.className='lyric-wrap';
+        const lyric = document.createElement('input'); lyric.className='lyric'; lyric.value = bar.lyric || '';
+
+        lyric.addEventListener('paste', (ev)=> {
+          try {
+            const txt = (ev.clipboardData || window.clipboardData).getData('text');
+            if (!txt) return;
+            const rawLines = txt.split(/\r\n|\r|\n/);
+            const lines = rawLines.map(l => l.replace(/\u00A0/g,' ')).filter(l => l.trim() !== '');
+            if (!lines || lines.length === 0) { ev.preventDefault(); return; }
+            if (lines.length === 1) {
+              ev.preventDefault();
+              const tm = syncDomToStorage();
+              tm[ti].bars[bi].lyric = lines[0];
+              save(tm); render();
+              setTimeout(()=>{ const trackEls = document.querySelectorAll('.track'); const trackEl = trackEls[ti]; if(!trackEl) return; const lyricInputs = trackEl.querySelectorAll('.bar .lyric'); if(lyricInputs[bi]) { lyricInputs[bi].focus(); const v=lyricInputs[bi].value; lyricInputs[bi].setSelectionRange(v.length,v.length); } }, 40);
+              return;
+            }
+            ev.preventDefault();
+            const tracksModel = syncDomToStorage();
+            if (!tracksModel[ti] || !tracksModel[ti].bars) return;
+            tracksModel[ti].bars[bi].lyric = lines[0];
+            for (let i=1;i<lines.length;i++) tracksModel[ti].bars.splice(bi + i, 0, { chord:'', lyric:lines[i], width:240, chordWidth:undefined, chords: [] });
+            save(tracksModel); render();
+            setTimeout(()=> {
+              const trackEls = document.querySelectorAll('.track'); const trackEl = trackEls[ti]; if(!trackEl) return;
+              const lyricInputs = trackEl.querySelectorAll('.bar .lyric'); const tracksNow = load();
+              for (let k=0;k<lines.length;k++){ const idx = bi + k; const inp = lyricInputs[idx]; if(!inp) continue;
+                const measuredTextW = measureInputTextWidth(inp);
+                const extras = computeHorizontalExtras(inp);
+                const desiredLyricW = measuredTextW + extras;
+                inp.style.width = desiredLyricW + 'px'; inp.dataset.userMinWidth = desiredLyricW;
+                const barElNow = inp.closest('.bar'); const chordElNow = barElNow.querySelector('.chord'); const chordW = chordElNow ? Math.round(chordElNow.getBoundingClientRect().width) : 0;
+                const desiredBarW = Math.max(desiredLyricW + 24, chordW + 24, 120); barElNow.style.width = desiredBarW + 'px';
+                if(tracksNow[ti] && tracksNow[ti].bars[idx]) { tracksNow[ti].bars[idx].width = desiredBarW; if(chordElNow){ const measuredChord = Math.round(chordElNow.getBoundingClientRect().width); if(measuredChord) tracksNow[ti].bars[idx].chordWidth = measuredChord; } }
+              } save(tracksNow);
+              const lastIdx = bi + (lines.length - 1); if(lyricInputs[lastIdx]){ lyricInputs[lastIdx].focus(); const v = lyricInputs[lastIdx].value; lyricInputs[lastIdx].setSelectionRange(v.length,v.length); }
+            }, 40);
+          } catch(e){ return; }
+        });
+
+        lyric.addEventListener('input', (e)=> {
+          const t = load(); t[ti] = t[ti] || { title:'', bars:[] }; t[ti].bars[bi] = t[ti].bars[bi] || { chord:'', lyric:'' }; t[ti].bars[bi].lyric = e.target.value; save(t);
+          const measuredTextW = measureInputTextWidth(lyric);
+          const extras = computeHorizontalExtras(lyric);
+          const desiredLyricW = measuredTextW + extras;
+          lyric.style.width = desiredLyricW + 'px';
+          const chordsMulti = barEl.querySelectorAll('.chord-multi'); let chordMaxW = 0; chordsMulti.forEach(c=> chordMaxW = Math.max(chordMaxW, Math.round(c.getBoundingClientRect().width)));
+          const desiredBarW = Math.max(desiredLyricW + 24, chordMaxW + 24, 120);
+          if (desiredBarW > barEl.clientWidth) {
+            barEl.style.width = desiredBarW + 'px';
+            lyric.dataset.userMinWidth = desiredLyricW;
+            const t2 = load(); t2[ti] = t2[ti] || { title:'', bars:[] }; t2[ti].bars[bi] = t2[ti].bars[bi] || {}; t2[ti].bars[bi].width = desiredBarW; save(t2);
+          } else { adjustInputWidth(lyric); }
+        });
+
+        const lHandle = document.createElement('div'); lHandle.className='lyric-resize-handle';
+        lyricWrap.appendChild(lyric); lyricWrap.appendChild(lHandle);
+
+        barEl.appendChild(chordsLayer); barEl.appendChild(lyricWrap); staff.appendChild(barEl);
+
+        if (!Array.isArray(bar.chords)) {
+          if (bar.chord && typeof bar.chord === 'string' && bar.chord.trim() !== '') bar.chords = [{ text:bar.chord, left:8, width: bar.chordWidth || undefined }];
+          else bar.chords = bar.chords || [];
+        }
+
+        bar.chords = bar.chords || [];
+        bar.chords.forEach((chObj, ci) => {
+          const cEl = createChordElement(chObj, barEl, ti, bi, ci);
+          chordsLayer.appendChild(cEl);
+        });
+
+        const legacyChord = barEl.querySelector('.chord');
+        if (legacyChord) {
+          if (bar.chordWidth) {
+            const barInnerAvailable = Math.max(48, barEl.clientWidth - 24);
+            const appliedChordW = Math.min(bar.chordWidth, barInnerAvailable);
+            legacyChord.style.width = appliedChordW + 'px';
+            legacyChord.dataset.userMinWidth = appliedChordW;
+            legacyChord.dataset.preserveWidth = '1';
+            legacyChord.style.visibility = '';
+          }
+          legacyChord.oninput = (e) => {
+            if (legacyChord.dataset.preserveWidth === '1') delete legacyChord.dataset.preserveWidth;
+            const t = load(); t[ti] = t[ti] || { title:'', bars:[] }; t[ti].bars[bi] = t[ti].bars[bi] || { chord:'', lyric:'' }; t[ti].bars[bi].chord = e.target.value; adjustInputWidth(legacyChord);
+            const measured = Math.round(legacyChord.getBoundingClientRect().width); if (measured) t[ti].bars[bi].chordWidth = measured; save(t);
+          };
+          makeAutosize(legacyChord);
+          if (!bar.chordWidth) legacyChord.style.visibility = '';
+        }
+
+        makeAutosize(lyric);
+        requestAnimationFrame(()=> ensureBarControlsFit(barEl, ti, bi) );
+
+        if (bar.width) {
+          const computedChordW = 0;
+          const guessLyricW = Math.max(80, bar.width - Math.round(computedChordW) - 24);
+          lyric.dataset.userMinWidth = guessLyricW;
+          lyric.style.width = Math.max(guessLyricW, parseInt(lyric.style.width || 0) || 0) + 'px';
+        }
+
+        attachLyricResize(lHandle, lyric, barEl, tracks, ti, bi, bar);
+      });
+    }
+
+    container.appendChild(el);
+  });
+
+  const updatedTracks = load();
+  const trackEls = container.querySelectorAll('.track');
+  const anySolo = updatedTracks.some(t => t && t.solo);
+  trackEls.forEach((trackEl, idx) => {
+    const model = updatedTracks[idx];
+    if (anySolo) {
+      if (!model || !model.solo) trackEl.classList.add('hidden-by-solo');
+      else { trackEl.classList.remove('hidden-by-solo'); trackEl.classList.add('solo-indicator'); }
+    } else { trackEl.classList.remove('hidden-by-solo'); trackEl.classList.remove('solo-indicator'); }
+    const btn = trackEl.querySelector('.solo-btn');
+    if (btn) { if (model && model.solo) btn.classList.add('active'); else btn.classList.remove('active'); }
+  });
+
+  const addBtn = document.querySelector('.add'); if (addBtn) addBtn.style.display = anySolo ? 'none' : '';
+
+  function finalizeAutosize(){ autosizeAllBars(); requestAnimationFrame(()=>requestAnimationFrame(autosizeAllBars)); }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(finalizeAutosize).catch(finalizeAutosize); else finalizeAutosize();
+
+  // After render, schedule chord sizing (batched) to avoid blocking main thread
+  requestAnimationFrame(() => {
+    scheduleMeasureAllVisibleChords();
+
+    // restore container scroll
+    try {
+      if (container && typeof container.scrollTop === 'number') {
+        const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight);
+        container.scrollTop = Math.min(prevContainerScroll, maxScroll);
+      }
+    } catch (e) {}
+
+    // restore window scroll
+    try { window.scrollTo(0, prevWindowY); } catch (e) {}
+
+    // restore focus & selection
+    if (activeInfo && typeof activeInfo.ti === 'number' && typeof activeInfo.bi === 'number') {
+      const newTrackEls = Array.from(container.querySelectorAll('.track'));
+      const newTrackEl = newTrackEls[activeInfo.ti];
+      if (newTrackEl) {
+        const newBarEls = Array.from(newTrackEl.querySelectorAll('.bar'));
+        const newBarEl = newBarEls[activeInfo.bi];
+        if (newBarEl) {
+          let target = null;
+          if ((activeInfo.classes || '').indexOf('lyric') !== -1) target = newBarEl.querySelector('.lyric');
+          else if ((activeInfo.classes || '').indexOf('chord-input-inner') !== -1) target = newBarEl.querySelector('.chord-input-inner');
+          else target = newBarEl.querySelector('input');
+          if (target) {
+            target.focus();
+            try {
+              if (activeInfo.selStart != null && activeInfo.selEnd != null) target.setSelectionRange(activeInfo.selStart, activeInfo.selEnd);
+            } catch (e) {}
+          }
+        }
+      }
+    }
+  });
+}
+
+/* ===== Lyric resize handle ===== */
+function attachLyricResize(handle, lyricInput, barEl, tracks, ti, bi, barObj) {
+  let startX=0, startLyricW=0, pointerId=null;
+  const minLyricW=60, maxLyricW=1200, extraForBar=24;
+  const onPointerMove = (ev) => {
+    if (pointerId !== ev.pointerId) return;
+    ev.preventDefault();
+    const dx = ev.clientX - startX;
+    let newLyricW = Math.max(minLyricW, Math.min(maxLyricW, Math.round(startLyricW + dx)));
+    lyricInput.dataset.userMinWidth = newLyricW;
+    lyricInput.style.transition='none';
+    barEl.style.transition='none';
+    lyricInput.style.width = newLyricW + 'px';
+    const chordInputs = barEl.querySelectorAll('.chord-multi');
+    let chordW=0; chordInputs.forEach(c=> chordW = Math.max(chordW, Math.round(c.getBoundingClientRect().width)));
+    const desiredBarW = Math.max(newLyricW + extraForBar, chordW + extraForBar, 100);
+    barEl.style.width = desiredBarW + 'px';
+  };
+  const onPointerUp = (ev) => {
+    if (pointerId !== ev.pointerId) return;
+    ev.preventDefault();
+    const finalBarW = parseInt(barEl.style.width, 10) || Math.round(barEl.getBoundingClientRect().width);
+    const finalLyricW = Math.round(lyricInput.getBoundingClientRect().width);
+    barObj.width = finalBarW; save(tracks);
+    const overshoot=8, startBarW = Math.min(finalBarW+overshoot,2000), startLyricW = finalLyricW+overshoot;
+    lyricInput.style.transition='none'; barEl.style.transition='none';
+    barEl.style.width = startBarW + 'px'; lyricInput.style.width = startLyricW + 'px';
+    requestAnimationFrame(()=>{ const dur = 180; barEl.style.transition = `width ${dur}ms ease`; lyricInput.style.transition = `width ${dur}ms ease`; requestAnimationFrame(()=>{ barEl.style.width = finalBarW + 'px'; lyricInput.style.width = finalLyricW + 'px'; }); const cleanup = ()=>{ barEl.style.transition='none'; lyricInput.style.transition='none'; barEl.removeEventListener('transitionend', cleanup); }; barEl.addEventListener('transitionend', cleanup); });
+    window.removeEventListener('pointermove', onPointerMove); window.removeEventListener('pointerup', onPointerUp);
+    try{ ev.target.releasePointerCapture && ev.target.releasePointerCapture(ev.pointerId); }catch(e){}
+    pointerId=null;
+  };
+  handle.addEventListener('pointerdown', (ev)=>{ ev.preventDefault(); pointerId = ev.pointerId; startX = ev.clientX; startLyricW = Math.round(lyricInput.getBoundingClientRect().width); try{ ev.target.setPointerCapture && ev.target.setPointerCapture(ev.pointerId); }catch(e){} window.addEventListener('pointermove', onPointerMove); window.addEventListener('pointerup', onPointerUp); });
+  handle.draggable = false;
+}
+
+/* ===== Mutations: add/insert/delete bars/tracks ===== */
+function addTrack() {
+  const tracks = syncDomToStorage();
+  tracks.push({
+    title: `New Song ${tracks.length + 1}`,
+    bars: [
+      { chord: "", lyric: "", width: 160, chordWidth: undefined, chords: [] }
+    ],
+    open: false,
+    solo: false
+  });
+  save(tracks);
+  render();
+}
+
+function addBar(ti) {
+  const tracks = syncDomToStorage();
+  tracks[ti].bars.push({ chord:"", lyric:"", width: 240, chordWidth:undefined, chords: [] });
+  save(tracks);
+  render();
+  scheduleMeasureAllVisibleChords();
+}
+
+function insertBar(ti, bi) {
+  const tracks = syncDomToStorage();
+  tracks[ti].bars.splice(bi,0,{ chord:"", lyric:"", width: 240, chordWidth:undefined, chords: [] });
+  save(tracks);
+  render();
+  scheduleMeasureAllVisibleChords();
+}
+
+function deleteBar(ti, bi) { const tracks = syncDomToStorage(); tracks[ti].bars.splice(bi,1); save(tracks); render(); scheduleMeasureAllVisibleChords(); }
+function deleteTrack(ti) { const tracks = syncDomToStorage(); tracks.splice(ti,1); save(tracks); render(); scheduleMeasureAllVisibleChords(); }
+
+/* ===== Transpose (now schedules batched remeasure) ===== */
+const NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+function transposeChord(chord, steps) {
+  const root = chord.match(/[A-G]#?/);
+  if (!root) return chord;
+  const i = NOTES.indexOf(root[0]);
+  if (i === -1) return chord;
+  return chord.replace(root[0], NOTES[(i + steps + 12) % 12]);
+}
+function transposeSong(ti, steps) {
+  const tracks = syncDomToStorage(); const track = tracks[ti]; if (!track) return;
+  track.bars.forEach(bar => {
+    if (Array.isArray(bar.chords)) bar.chords.forEach(c => { if (c && c.text) c.text = transposeChord(c.text, steps); });
+    if (bar.chord) bar.chord = transposeChord(bar.chord, steps);
+  });
+  save(tracks);
+  render();
+  // schedule batched chord measurements so UI doesn't freeze
+  scheduleMeasureAllVisibleChords();
+}
+
+/* Keep widths correct after resize */
+window.addEventListener('resize', () => document.querySelectorAll('.bar input').forEach(adjustInputWidth));
+(function initBodyResizeObserver(){ if(!window.__liveChart_bodyROInitialized){ try{ const ro = new ResizeObserver(()=>document.querySelectorAll('.bar input').forEach(adjustInputWidth)); ro.observe(document.body); window.__liveChart_bodyROInitialized = true; }catch(e){} }})();
+
+/* ===== Settings UI wiring ===== */
+const settingsToggle = document.getElementById('settingsToggle');
+const settingsPanel = document.getElementById('settingsPanel');
+const settingsClose = document.getElementById('settingsClose');
+
+const transparencyRange = document.getElementById('transparencyRange');
+const transparencyValue = document.getElementById('transparencyValue');
+const chordSizeRange = document.getElementById('chordSizeRange');
+const chordSizeValue = document.getElementById('chordSizeValue');
+const lyricSizeRange = document.getElementById('lyricSizeRange');
+const lyricSizeValue = document.getElementById('lyricSizeValue');
+
+settingsToggle.addEventListener('click', () => { settingsPanel.classList.toggle('open'); settingsPanel.setAttribute('aria-hidden', !settingsPanel.classList.contains('open')); });
+settingsClose.addEventListener('click', () => { settingsPanel.classList.remove('open'); settingsPanel.setAttribute('aria-hidden', 'true'); });
+
+const settings = loadSettings(); applySettingsToUI(settings); applySettingsToDocument(settings);
+
+transparencyRange.addEventListener('input', (e)=> { const v = Number(e.target.value); transparencyValue.textContent = v + '%'; const s = loadSettings(); s.transparency = v; saveSettings(s); applySettingsToDocument(s); });
+chordSizeRange.addEventListener('input', (e)=> { const v = Number(e.target.value); chordSizeValue.textContent = v + 'px'; const s = loadSettings(); s.chordSize = v; saveSettings(s); applySettingsToDocument(s); });
+lyricSizeRange.addEventListener('input', (e)=> { const v = Number(e.target.value); lyricSizeValue.textContent = v + 'px'; const s = loadSettings(); s.lyricSize = v; saveSettings(s); applySettingsToDocument(s); });
+
+document.addEventListener('click', (ev)=>{ if(!settingsPanel.classList.contains('open')) return; if(ev.target === settingsToggle || settingsPanel.contains(ev.target) || ev.target.closest('.settings-panel')) return; settingsPanel.classList.remove('open'); settingsPanel.setAttribute('aria-hidden','true'); });
+
+applySettingsToUI(loadSettings());
+
+/* Robustly wire Add Song button */
+(function wireAddSongButton(){ const addBtn = document.querySelector('.add'); if(!addBtn) return; addBtn.addEventListener('click', (ev)=>{ try{ addTrack(); }catch(err){ console.error('Error calling addTrack():', err); alert('Error adding song. See console.'); } }); })();
+
+render();
+</script>
+</body>
+</html>
